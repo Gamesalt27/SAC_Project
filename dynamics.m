@@ -46,6 +46,7 @@ function [x] = dynamics(t, eta, eps, omega, r0, v0, params)
     etadot = -0.5*dot(eps,omega_BOB);
     qdot = normqdot([eta; eps], [etadot; epsdot]);
 
+    disp(b/norm(b))
     x = [qdot; omegadot];
 end
 

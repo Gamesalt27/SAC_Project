@@ -19,6 +19,6 @@ function [b] = getMagVec(r, t, params)
     phase = beta_m + rad2deg(we*t);   % Current phase of the dipole
     rmag = vecnorm(r,2,1);
 
-    d = -Me*[sind(gamma_m).*sind(phase); -sind(gamma_m).*cosd(phase); cosd(gamma_m)];   % dipole vector
+    d = -Me*[sind(gamma_m).*sind(phase); -sind(gamma_m).*cosd(phase); cosd(gamma_m)+0*phase];   % dipole vector
     b = 1./rmag.^3 .* (3*dot(d,r).*r./rmag.^2 - d);                                    % magnetic field vector  
 end

@@ -1,4 +1,4 @@
-clearvars; close all; clc;
+% clearvars; close all; clc;
 
 %% PAPER SIMULATIONS
 disp("============== Simulations From The Paper ==============")
@@ -15,7 +15,7 @@ gamma_m = 11.44;    % [deg] geomagnetic plane tilt
 beta_m  = 0;        % [deg] initial geomagnetic phase
 mu      = 3.986e5;  % [km^3/s^2] earth gravitational parameter
 Re      = 6378;     % [km] earth radius
-N       = 7;        % [-] number of orbits
+N       = 5;        % [-] number of orbits
 n       = 1e3;      % [-] points per orbit
 
 % Cases A, B, and C
@@ -28,14 +28,14 @@ Q0     = [0.375 -0.062  0.925 -0.007;
           0.646  0.525 -0.514  0.206].';   % [-] initial quaternions (LVLH to body)
 Q0 = Q0./vecnorm(Q0, 2, 1);
 
-Omega0  = [0, 0, 272.858];   % inital ascending node
-arglat0 = [0, 0, 36.101];    % initial argument of latitude
+Omega0  = [30, 272, 272];   % inital ascending node
+arglat0 = [0, 36, 36];    % initial argument of latitude
 
 
 
 %% Simulation
 
-results = cell(1,length(i));
+% results = cell(1,length(i));
 opts = odeset(Refine=1, Stats='on');
 tspan = [0, N*To];
 
@@ -51,15 +51,13 @@ for j=1:length(i)
     x0 = [Q0(:,j); omega0(:,j)].';
     [Time, x] = ode89(fun, tspan, x0, opts);
     Q = x(:,1:4); omega = x(:,5:end); 
-    [~,b,m,M] = dynamics(Time, Q(:,1), Q(:,2:4).', omega.', r0, v0, I=I, kw=kw);
+    [rates,b,m,M] = dynamics(Time, Q(:,1), Q(:,2:4).', omega.', r0, v0, I=I, kw=kw);
     b = b.'; m = m.'; M = M.';
     results(j) = {table(Time, Q, omega, b, m, M)};
 end
 
 
 %% Plots
-
-
 
 handle = figure('Position', [100, 100, 600, 400]);
 hold on; grid on;
@@ -69,83 +67,38 @@ end
 hold off; title("Angular rate over time"); xlabel('t/T [-]'); xlim([0,5])
 ylabel('||\omega|| [rad/s]'); legend('||\omega_A||', '||\omega_B||', '||\omega_C||')
 
-handle = figure('Position', [100, 100, 600, 400]);
-hold on; grid on;
-for j=1:length(results)
-    plot(results{j}.Time/To, vecnorm(results{j}.Q,2,2), LineWidth=1.5);
-end
-hold off; title("Quaternion over time"); xlabel('t/T [-]');
-ylabel('||q||'); legend('||q_A||', '||q_B||', '||q_C||')
-
+% handle = figure('Position', [100, 100, 600, 400]);
+% hold on; grid on;
+% for j=1:length(results)
+%     plot(results{j}.Time/To, vecnorm(results{j}.Q,2,2), LineWidth=1.5);
+% end
+% hold off; title("Quaternion over time"); xlabel('t/T [-]');
+% ylabel('||q||'); legend('||q_A||', '||q_B||', '||q_C||')
+% 
 % handle = figure('Position', [100, 100, 600, 400]);
 % tl = tiledlayout(3, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
 % 
 % nexttile;
 % hold on; grid on;
-% plot(Time, omega(:,1), 'b', 'LineWidth', 1.5);
+% plot(results{1}.Time/To, results{1}.omega(:,1), 'b', 'LineWidth', 1.5);
 % title('\omega_1');
-% xlabel('Time [s]');
+% xlabel('t/T [-]');
 % ylabel('\omega_1 [rad/s]');
 % hold off;
 % 
 % nexttile;
 % hold on; grid on;
-% plot(Time, omega(:,2), 'b', 'LineWidth', 1.5);
+% plot(results{1}.Time/To, results{1}.omega(:,2), 'b', 'LineWidth', 1.5);
 % title('\omega_2');
-% xlabel('Time [s]');
+% xlabel('t/T [-]');
 % ylabel('\omega_2 [rad/s]');
 % hold off;
 % 
 % nexttile;
 % hold on; grid on;
-% plot(Time, omega(:,3), 'b', 'LineWidth', 1.5);
+% plot(results{1}.Time/To, results{1}.omega(:,3), 'b', 'LineWidth', 1.5);
 % title('\omega_3');
-% xlabel('Time [s]');
+% xlabel('t/T [-]');
 % ylabel('\omega_3 [rad/s]');
 % hold off;
 % 
-% % exportgraphics(handle2, "graphs/eigenangle_omega_histories.png", "Resolution", 300);
-
-% handle1 = figure('Position', [100, 100, 600, 400]);
-% tl1 = tiledlayout(2, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
-
-% nexttile;
-% hold on; grid on;
-% for j=1:length(results)
-%     plot(results{j}.Time/To, vecnorm(results{j}.Q(:,2),2,2), LineWidth=1.5);
-% end
-% title('\epsilon_1');
-% xlabel('Time [s]');
-% ylabel('\epsilon_1');
-% legend('A', 'B', 'C')
-% hold off;
-% 
-% nexttile;
-% hold on; grid on;
-% for j=1:length(results)
-%     plot(results{j}.Time/To, vecnorm(results{j}.Q(:,3),2,2), LineWidth=1.5);
-% end
-% title('\epsilon_2');
-% xlabel('Time [s]');
-% ylabel('\epsilon_2');
-% hold off;
-% 
-% nexttile;
-% hold on; grid on;
-% for j=1:length(results)
-%     plot(results{j}.Time/To, vecnorm(results{j}.Q(:,4),2,2), LineWidth=1.5);
-% end
-% title('\epsilon_3');
-% xlabel('Time [s]');
-% ylabel('\epsilon_3');
-% hold off;
-% 
-% nexttile;
-% hold on; grid on;
-% for j=1:length(results)
-%     plot(results{j}.Time/To, vecnorm(results{j}.Q(:,1),2,2), LineWidth=1.5);
-% end
-% title('\eta');
-% xlabel('Time [s]');
-% ylabel('\eta');
-% hold off;

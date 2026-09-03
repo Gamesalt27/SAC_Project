@@ -1,3 +1,6 @@
 *
 !.gitignore
+!data\*.mat
 !*.m
+getMagVec_V2.m
+magnetic_detumbling_mc.m

@@ -55,7 +55,7 @@ function fig = angularRate(results, To, leg_text, trialIdx, options)
     hold off;
     title('Angular rate over time'); xlabel('t/T [-]');
     ylabel('||\omega|| [rad/s]');
-    if isfield(leg_text, 'omega') && ~isempty(leg_text.omega)
+    if isfield(leg_text, 'omega') && ~isempty({leg_text.omega})
         legend(leg_text.omega, 'Interpreter', 'tex', 'Location', 'best');
     end
     
@@ -83,7 +83,7 @@ function fig = quaternionNorm(results, To, leg_text, trialIdx, options)
     hold off;
     title('Quaternion over time'); xlabel('t/T [-]');
     ylabel('||q||');
-    if isfield(leg_text, 'Q') && ~isempty(leg_text.Q)
+    if isfield(leg_text, 'Q') && ~isempty({leg_text.Q})
         legend(leg_text.Q, 'Interpreter', 'tex', 'Location', 'best');
     end
     
@@ -162,7 +162,7 @@ function fig = controlAuthority(results, To, convIdx, leg_text, trialIdx, option
     xlabel('t/T [-]');
     ylabel('\alpha(\omega, b) [deg]');
     ylim([0, 180]);
-    if isfield(leg_text, 'alpha') && ~isempty(leg_text.alpha)
+    if isfield(leg_text, 'alpha') && ~isempty({leg_text.alpha})
         legend(leg_text.alpha, 'Location', 'best', 'Interpreter', 'tex');
     end
     
@@ -171,13 +171,13 @@ end
 
 %% ------------------------------------------------------------------ %%
 
-function fig = settlingTimeVsKw(IC, convTime, options)
+function fig = settlingTimeVsKw(kw, convTime, options)
 %SETTLINGTIMEVSKW Settling time (t/T) vs kw for the 'optKw' sweep.
-%   IC.kw(1) is should be the analytical reference gain, IC.kw(2:end)
+%   kw(1) should be the analytical reference gain, kw(2:end)
 %   should be the numerically swept gains.
 
     arguments
-        IC       struct
+        kw       (1,:) double
         convTime (1,:) double
         options.SaveName (1,1) string = ""
     end
@@ -186,9 +186,9 @@ function fig = settlingTimeVsKw(IC, convTime, options)
     
     fig = figure('Position', [100, 100, 600, 400]);
     hold on; grid on;
-    plot(IC.kw(2:end), convTime(2:end), 'b', 'LineWidth', 1.5, 'HandleVisibility', 'off');
-    plot(IC.kw(idx), Tmin, 'g*', 'DisplayName', 'Optimal');
-    plot(IC.kw(1), convTime(1), 'k*', 'DisplayName', 'Analytical');
+    plot(kw(2:end), convTime(2:end), 'b', 'LineWidth', 1.5, 'HandleVisibility', 'off');
+    plot(kw(idx), Tmin, 'g*', 'DisplayName', 'Optimal');
+    plot(kw(1), convTime(1), 'k*', 'DisplayName', 'Analytical');
     hold off;
     title('Settling time vs k_\omega'); ylabel('t/T');
     xlabel('k_\omega'); legend('show', 'Interpreter', 'tex', 'Location', 'best');
@@ -198,16 +198,16 @@ end
 
 %% ------------------------------------------------------------------ %%
 
-function [fig, pctImprovement] = nearAComparison(IC, convTime, trials, options)
+function [fig, pctImprovement] = nearAComparison(kw, convTime, trials, options)
 %NEARACOMPARISON Bar chart comparing settling time for the analytical
 %   vs. optimal kw for the 'NearA' scenarios (control +
 %   perturbed Q0/omega0/theta0 cases).
 
     arguments
-        IC       struct
+        kw       (1,:) double
         convTime (1,:) double
         trials   (1,1) double {mustBePositive, mustBeInteger}
-        options.ScenarioLabels cell = {'Control', 'Initial Q', 'Initial $\omega$', 'Initial \theta'}    % I don't know why \omega requires $ but \theta doesn't
+        options.ScenarioLabels cell = {'Control', 'Initial Q', 'Initial \omega', 'Initial \theta'}    % I don't know why \omega requires $ but \theta doesn't
         options.SaveName (1,1) string = ""
     end
     
@@ -216,8 +216,8 @@ function [fig, pctImprovement] = nearAComparison(IC, convTime, trials, options)
     analyticalTime = convTime(1:nScenarios);
     optimalTime    = convTime(nScenarios+1:end);
     
-    analyticalKw = IC.kw(1);
-    optimalKw    = IC.kw(nScenarios+1);
+    analyticalKw = kw(1);
+    optimalKw    = kw(nScenarios+1);
     
     pctImprovement = 100*(analyticalTime - optimalTime)./analyticalTime;
     scenarioLabels = options.ScenarioLabels;

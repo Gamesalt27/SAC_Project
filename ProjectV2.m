@@ -8,9 +8,19 @@ clearvars; close all; clc;
 % optKw - find optimal kw for scenario A
 % NearA - optimal value vs analytic at scenarios like A
 % attitudeSweep - optimal vs analytic kw over a grid of initial attitudes
-sim_type = "NearA";
+sim_type = "cmp";
 parallels = false;  % Run on multiple cores
 conv_tol = 0.01; % Convergence tolarence.
+enabledPlots = struct( ...      % initilize which plots to plot
+    'angularRate', false, ...
+    'quaternionNorm', false, ...
+    'actuatorDipoles', false, ...
+    'controlAuthority', false, ...
+    'settlingTimeVsKw', false, ...
+    'nearAComparison', false, ...
+    'attitudeSweepByTrial', false, ...
+    'attitudeSweepByAngles', false, ...
+    'controlAngleSweep', false);
 
 J1 = 0.33; J2 = 0.37; J3 = 0.35; % [kg m^2] Principal moments of inertia
 I = diag([J1, J2, J3]);
@@ -23,146 +33,189 @@ beta_m = 0; % [deg] initial geomagnetic phase
 mu = 3.986e5; % [km^3/s^2] earth gravitational parameter
 Re = 6378; % [km] earth radius
 N = 8; % [-] number of orbits
+l = 1; % which trial to use for actuator dipoles
 kwopt_A = 8.340986872382716e-04; % Optimal kw for case A found numerically.
+kwopt_B = 0.001145973154362;
 
 
 a = (mu*To^2/(4*pi^2))^(1/3); % [km] semi major axis
 
 switch sim_type
-case 'paper'
-% Cases A, B, and C
-i = [11, 65, 65]; % [deg] inclination
-trials = length(i);
-omega0 = [0.604 -0.76 -0.384;
-          0.604 -0.76 -0.384;
-          1      0     0].'; % [rad/s] initial angular velocity b to I (body frame)
-Q0 = [0.375 -0.062  0.925 -0.007;
-      0.375 -0.062  0.925 -0.007;
-      0.646  0.525 -0.514  0.206].'; % [-] initial quaternions (LVLH to body)
-Q0 = Q0./vecnorm(Q0, 2, 1);
+    case 'paper'
+        % Cases A, B, and C
+        i = [11, 65, 65]; % [deg] inclination
+        trials = length(i);
+        omega0 = [0.604 -0.76 -0.384;
+                  0.604 -0.76 -0.384;
+                  1      0     0].'; % [rad/s] initial angular velocity b to I (body frame)
+        Q0 = [0.375 -0.062  0.925 -0.007;
+              0.375 -0.062  0.925 -0.007;
+              0.646  0.525 -0.514  0.206].'; % [-] initial quaternions (LVLH to body)
+        Q0 = Q0./vecnorm(Q0, 2, 1);
+        
+        Omega0 = [30, 272, 272]; % [deg] inital ascending node
+        arglat0 = [0, 36, 36]; % [deg] initial argument of latitude
+        w0 = zeros(size(i)); % [deg] initial argument of perigee
+        ecc = zeros(size(i)); % [-] eccentricity
+        leg_text = struct("omega", ['||\omega_A||';'||\omega_B||';'||\omega_C||'],...
+        "Q", ['||q_A||';'||q_B||';'||q_C||'],...
+        "alpha", ['\alpha_A';'\alpha_B';'\alpha_C']);
+        
+        kw = analyticKw(i, Omega0, gamma_m, beta_m, To, I);
+        IC = buildIC(a, ecc, i, Omega0, arglat0, w0, Q0, omega0, kw);
+        enabledPlots.angularRate = true;
+        enabledPlots.quaternionNorm = true;
+        % enabledPlots.actuatorDipoles = true; l = 1;
+        enabledPlots.controlAuthority = true;
 
-Omega0 = [30, 272, 272]; % [deg] inital ascending node
-arglat0 = [0, 36, 36]; % [deg] initial argument of latitude
-w0 = zeros(size(i)); % [deg] initial argument of perigee
-ecc = zeros(size(i)); % [-] eccentricity
-leg_text = struct("omega", ['||\omega_A||';'||\omega_B||';'||\omega_C||'],...
-"Q", ['||q_A||';'||q_B||';'||q_C||'],...
-"alpha", ['\alpha_A';'\alpha_B';'\alpha_C']);
-
-kw = analyticKw(i, Omega0, gamma_m, beta_m, To, I);
-IC = buildIC(a, ecc, i, Omega0, arglat0, w0, Q0, omega0, kw);
+     case 'cmp'
+        % Compare two cases 
+        i = 11; % [deg] inclination
+        trials = 2;
+        omega0 = [0.604 -0.76 -0.384;
+                  0.604 -0.76 -0.384].'; % [rad/s] initial angular velocity b to I (body frame)
+        Q0 = [-0.063674964619231 0.265647338013425 0.898765221065922 -0.342925747195286;
+              -0.063674964619231 0.265647338013425 0.898765221065922 -0.342925747195286].'; % [-] initial quaternions (LVLH to body)
+        Q0 = Q0./vecnorm(Q0, 2, 1);
+        
+        Omega0 = 0; % [deg] inital ascending node
+        arglat0 = 0; % [deg] initial argument of latitude
+        w0 = 0; % [deg] initial argument of perigee
+        ecc = 0; % [-] eccentricity
+        leg_text = struct("omega", ['||\omega_1||';'||\omega_2||'],...
+        "Q", ['||q_1||';'||q_2||'],...
+        "alpha", ['\alpha_1';'\alpha_2']);
+        
+        kw = analyticKw(i, Omega0, gamma_m, beta_m, To, I);
+        IC = buildIC(a, ecc, i, Omega0, arglat0, w0, Q0, omega0, [kw kwopt_A], trials);
+        enabledPlots.angularRate = true;
+        enabledPlots.quaternionNorm = true;
+        % enabledPlots.actuatorDipoles = true; l = 1;
+        enabledPlots.controlAuthority = true;
 
     case 'ecc'  % Not a good simulation, should try to stay at a similar average altitude instead of keeping period same
-ecc = [0 0.1 0.5 0.85 0.99]; % [-] eccentricity
-trials = length(ecc);
-i = ones(size(ecc))*65; % [deg] inclination
-omega0 = [0.604;-0.76;-0.384]*ones(size(ecc)); % [rad/s] initial angular velocity b to I (body frame)
-Q0 = [0.375;-0.062;0.925;-0.007]*ones(size(ecc)); % [-] initial quaternions (LVLH to body)
-Q0 = Q0./vecnorm(Q0, 2, 1);
+        ecc = [0 0.1 0.5 0.85 0.99]; % [-] eccentricity
+        trials = length(ecc);
+        i = ones(size(ecc))*65; % [deg] inclination
+        omega0 = [0.604;-0.76;-0.384]*ones(size(ecc)); % [rad/s] initial angular velocity b to I (body frame)
+        Q0 = [0.375;-0.062;0.925;-0.007]*ones(size(ecc)); % [-] initial quaternions (LVLH to body)
+        Q0 = Q0./vecnorm(Q0, 2, 1);
+        
+        Omega0 = zeros(size(ecc)); % [deg] inital ascending node
+        arglat0 = zeros(size(ecc)); % [deg] initial argument of latitude
+        w0 = zeros(size(ecc)); % [deg] initial argument of perigee
+        leg_text = struct("omega", compose('e=%0.2f',ecc),...
+        "Q", compose('e=%0.2f',ecc),...
+        "alpha", compose('e=%0.2f',ecc));
+        
+        kw = analyticKw(i, Omega0, gamma_m, beta_m, To, I);
+        IC = buildIC(a, ecc, i, Omega0, arglat0, w0, Q0, omega0, kw, trials);
 
-Omega0 = zeros(size(ecc)); % [deg] inital ascending node
-arglat0 = zeros(size(ecc)); % [deg] initial argument of latitude
-w0 = zeros(size(ecc)); % [deg] initial argument of perigee
-leg_text = struct("omega", compose('e=%0.2f',ecc),...
-"Q", compose('e=%0.2f',ecc),...
-"alpha", compose('e=%0.2f',ecc));
+    case 'optKw'
+        trials = 300;
+        parallels = true;
+        i = 65; % [deg] inclination
+        omega0 = [0.604 -0.76 -0.384].'; % [rad/s] initial angular velocity b to I (body frame)
+        Q0 = [0.375 -0.062 0.925 -0.007].'; % [-] initial quaternions (LVLH to body)
+        Q0 = Q0./vecnorm(Q0, 2, 1);
+        
+        Omega0 = 0; % [deg] inital ascending node
+        arglat0 = 0; % [deg] initial argument of latitude
+        w0 = 0; % [deg] initial argument of perigee
+        ecc = 0; % [-] eccentricity
+        
+        kw_ref = analyticKw(i, Omega0, gamma_m, beta_m, To, I);
+        kw = [kw_ref, linspace(0.0011, 0.0012, trials-1)];
+        IC = buildIC(a, ecc, i, Omega0, arglat0, w0, Q0, omega0, kw, trials);
+        leg_text = struct("omega", compose('k_\\omega=%e',kw),...
+        "Q", compose('k_\\omega=%e',kw),...
+        "alpha", compose('k_\\omega=%e',kw));
 
-kw = analyticKw(i, Omega0, gamma_m, beta_m, To, I);
-IC = buildIC(a, ecc, i, Omega0, arglat0, w0, Q0, omega0, kw);
+        enabledPlots.settlingTimeVsKw = true;
 
-case 'optKw'
-trials = 200;
-parallels = true;
-i = 11; % [deg] inclination
-omega0 = [0.604 -0.76 -0.384].'; % [rad/s] initial angular velocity b to I (body frame)
-Q0 = [0.375 -0.062 0.925 -0.007].'; % [-] initial quaternions (LVLH to body)
-Q0 = Q0./vecnorm(Q0, 2, 1);
+    case "NearA"
+        trials = 8;
+        i = 11; % [deg] inclination
+        omega0 = [0.604 -0.76 -0.384;
+                  0.604 -0.76 -0.384;
+                 -0.76   0.604 -0.384;
+                  0.604 -0.76 -0.384].'; % [rad/s] initial angular velocity b to I (body frame)
+        omega0 = [omega0,omega0];
+        Q0 = [0.375 -0.062  0.925 -0.007;
+              0.646  0.525 -0.514  0.206;
+              0.375 -0.062  0.925 -0.007;
+              0.375 -0.062  0.925 -0.007].'; % [-] initial quaternions (LVLH to body)
+        Q0 = Q0./vecnorm(Q0, 2, 1);
+        Q0 = [Q0, Q0];
+        
+        Omega0 = 0; % [deg] inital ascending node
+        arglat0 = [0 0 0 -10]; % [deg] initial argument of latitude
+        arglat0 = [arglat0,arglat0];
+        w0 = 0; % [deg] initial argument of perigee
+        ecc = 0; % [-] eccentricity
+        
+        kwAnalytic = analyticKw(i, Omega0, gamma_m, beta_m, To, I);
+        kw = [kwAnalytic*ones(1,trials/2),...
+            kwopt_A*ones(1,trials/2)]; 
+        IC = buildIC(a, ecc, i, Omega0, arglat0, w0, Q0, omega0, kw, trials);
+        leg_text = struct("omega", compose('k_\\omega=%e',kw),...
+        "Q", compose('k_\\omega=%e',kw),...
+        "alpha", compose('k_\\omega=%e',kw));
 
-Omega0 = 0; % [deg] inital ascending node
-arglat0 = 0; % [deg] initial argument of latitude
-w0 = 0; % [deg] initial argument of perigee
-ecc = 0; % [-] eccentricity
+        enabledPlots.angularRate = true;
+        enabledPlots.quaternionNorm = true;
+        % enabledPlots.actuatorDipoles = true; l = 1;
+        enabledPlots.controlAuthority = true;
+        enabledPlots.nearAComparison = true;
 
-kw_ref = analyticKw(i, Omega0, gamma_m, beta_m, To, I);
-kw = [kw_ref, linspace(0.9*kw_ref, 1.3*kw_ref, trials-1)];
-IC = buildIC(a, ecc, i, Omega0, arglat0, w0, Q0, omega0, kw);
-leg_text = struct("omega", compose('k_\\omega=%e',kw),...
-"Q", compose('k_\\omega=%e',kw),...
-"alpha", compose('k_\\omega=%e',kw));
+    case "attitudeSweep"
+        qA = [0.375; -0.062; 0.925; -0.007];
+        qA = qA / norm(qA);
+        
+        % Generate equally spaced quaternions relative to qA
+        axisColat = 15:15:165; % Angle between rotation vectors
+        axisLon = 0:30:330; % Complementry angle
+        rotAngle = 15:15:165; % Rotation angle
+        
+        [axisColatGrid,axisLonGrid,rotAngleGrid] = meshgrid(axisColat,axisLon,rotAngle);
+        axisColatGrid = reshape(axisColatGrid,1,[]);
+        axisLonGrid = reshape(axisLonGrid,1,[]);
+        rotAngleGrid = reshape(rotAngleGrid,1,[]);
+        
+        % Add pure rotations at the beginning
+        axisColatGrid = [zeros(size(rotAngle)), axisColatGrid];
+        axisLonGrid = [zeros(size(rotAngle)), axisLonGrid];
+        rotAngleGrid = [rotAngle, rotAngleGrid];
+        axisColat = [0, axisColat];
+        
+        u = [sind(axisColatGrid).*cosd(axisLonGrid).*sind(rotAngleGrid/2);...
+             sind(axisColatGrid).*sind(axisLonGrid).*sind(rotAngleGrid/2);...
+             cosd(axisColatGrid).*sind(rotAngleGrid/2)];
+        dQ = [cosd(rotAngleGrid/2);u]; % Difference Quaternion
+        Qsample = quatmultiply(dQ.',qA.').';    % Rotate qA by the difference quaternion
+        Qsample = [Qsample, Qsample];
+        
+        trials = length(Qsample);
+        parallels = true;
+        
+        i = 11;
+        Omega0 = 0;
+        arglat0 = 0;
+        w0 = 0;
+        ecc = 0;
+        
+        omega0v = [0.604; -0.76; -0.384];
+        
+        kwAnalytic = analyticKw(i, Omega0, gamma_m, beta_m, To, I);
+        
+        kw = [kwAnalytic*ones(1,trials/2), kwopt_A*ones(1,trials/2)];
+        IC = buildIC(a, ecc, i, Omega0, arglat0, w0, Qsample, omega0v, kw, trials);
+        
+        leg_text = struct("omega", [], "Q", [], "alpha", []);
 
-case "NearA"
-trials = 8;
-i = 11; % [deg] inclination
-omega0 = [0.604 -0.76 -0.384;
-          0.604 -0.76 -0.384;
-         -0.76   0.604 -0.384;
-          0.604 -0.76 -0.384].'; % [rad/s] initial angular velocity b to I (body frame)
-omega0 = [omega0,omega0];
-Q0 = [0.375 -0.062  0.925 -0.007;
-      0.646  0.525 -0.514  0.206;
-      0.375 -0.062  0.925 -0.007;
-      0.375 -0.062  0.925 -0.007].'; % [-] initial quaternions (LVLH to body)
-Q0 = Q0./vecnorm(Q0, 2, 1);
-Q0 = [Q0, Q0];
-
-Omega0 = 0; % [deg] inital ascending node
-arglat0 = [0 0 0 -10]; % [deg] initial argument of latitude
-arglat0 = [arglat0,arglat0];
-w0 = 0; % [deg] initial argument of perigee
-ecc = 0; % [-] eccentricity
-
-kwAnalytic = analyticKw(i, Omega0, gamma_m, beta_m, To, I);
-kw = [kwAnalytic*ones(1,trials/2),...
-    kwopt_A*ones(1,trials/2)]; 
-IC = buildIC(a, ecc, i, Omega0, arglat0, w0, Q0, omega0, kw);
-leg_text = struct("omega", compose('k_\\omega=%e',kw),...
-"Q", compose('k_\\omega=%e',kw),...
-"alpha", compose('k_\\omega=%e',kw));
-
-case "attitudeSweep"
-qA = [0.375; -0.062; 0.925; -0.007];
-qA = qA / norm(qA);
-
-% Generate equally spaced quaternions relative to qA
-axisColat = 15:15:165; % Angle between rotation vectors
-axisLon = 0:30:330; % Complementry angle
-rotAngle = 15:15:165; % Rotation angle
-
-[axisColatGrid,axisLonGrid,rotAngleGrid] = meshgrid(axisColat,axisLon,rotAngle);
-axisColatGrid = reshape(axisColatGrid,1,[]);
-axisLonGrid = reshape(axisLonGrid,1,[]);
-rotAngleGrid = reshape(rotAngleGrid,1,[]);
-
-% Add pure rotations at the beginning
-axisColatGrid = [zeros(size(rotAngle)), axisColatGrid];
-axisLonGrid = [zeros(size(rotAngle)), axisLonGrid];
-rotAngleGrid = [rotAngle, rotAngleGrid];
-axisColat = [0, axisColat];
-
-u = [sind(axisColatGrid).*cosd(axisLonGrid).*sind(rotAngleGrid/2);...
-     sind(axisColatGrid).*sind(axisLonGrid).*sind(rotAngleGrid/2);...
-     cosd(axisColatGrid).*sind(rotAngleGrid/2)];
-dQ = [cosd(rotAngleGrid/2);u]; % Difference Quaternion
-Qsample = quatmultiply(dQ.',qA.').';    % Rotate qA by the difference quaternion
-Qsample = [Qsample, Qsample];
-
-trials = length(Qsample);
-parallels = true;
-
-i = 11;
-Omega0 = 0;
-arglat0 = 0;
-w0 = 0;
-ecc = 0;
-
-omega0v = [0.604; -0.76; -0.384];
-
-kwAnalytic = analyticKw(i, Omega0, gamma_m, beta_m, To, I);
-
-kw = [kwAnalytic*ones(1,trials/2), kwopt_A*ones(1,trials/2)];
-IC = buildIC(a, ecc, i, Omega0, arglat0, w0, Qsample, omega0v, kw);
-
-leg_text = struct("omega", [], "Q", [], "alpha", []);
+        enabledPlots.attitudeSweepByTrial = true;
+        enabledPlots.attitudeSweepByAngles = true;
+        enabledPlots.controlAngleSweep = true;
 end
 
 %% Simulation
@@ -190,7 +243,7 @@ if parallels
             fprintf("Didn't converge in %d orbits", N)
         end
         convIdx(j) = min(lastAbove+1,length(Time));
-        convTime(j) = Time(convIdx(j))/To;
+        convTime(j) = interp1(vecnorm(omega,2,2), Time, conv_tol*norm(omega(1,:)))/To;
         send(D, 1);
     end
 
@@ -214,7 +267,7 @@ else
             fprintf("Didn't converge in %d orbits", N)
         end
         convIdx(j) = min(lastAbove+1,length(Time));
-        convTime(j) = Time(convIdx(j))/To;
+        convTime(j) = interp1(vecnorm(omega,2,2), Time, conv_tol*norm(omega(1,:)))/To;
     end
 
 end
@@ -223,48 +276,40 @@ end
 
 plots = plotting();
 
-plots.angularRate(results, To, leg_text);
-plots.quaternionNorm(results, To, leg_text);
-
-l = min(629, trials); % Which trial to plot the actuator dipoles for
-plots.actuatorDipoles(results, To, mlim, l);
-
-plots.controlAuthority(results, To, convIdx, leg_text);
-
-if strcmp(sim_type, "optKw")
-    plots.settlingTimeVsKw(kw, convTime);
-end
-
-if strcmp(sim_type, "NearA")
-    plots.nearAComparison(kw, convTime, trials);
-end
+ctx = struct('results',{results}, 'To',To, 'leg_text',leg_text, ...
+    'mlim',mlim, 'l',l, 'convIdx',convIdx, 'kw',kw, ...
+    'convTime',convTime, 'trials',trials);
 
 if strcmp(sim_type, "attitudeSweep")
-    [~, improvementPct] = plots.attitudeSweepByTrial(convTime, trials);
-    plots.attitudeSweepByAngles(axisColat, axisLon, rotAngle, ...
-        axisColatGrid, axisLonGrid, rotAngleGrid, improvementPct, ...
-        kwOptimal, kwAnalytic);
+    ctx.axisColat = axisColat; ctx.axisLon = axisLon; ctx.rotAngle = rotAngle;
+    ctx.axisColatGrid = axisColatGrid; ctx.axisLonGrid = axisLonGrid;
+    ctx.rotAngleGrid = rotAngleGrid;
+    ctx.kwOptimal = kwopt_B; ctx.kwAnalytic = kwAnalytic;
+    ctx.improvementPct = 100*(convTime(1:trials/2)-convTime(trials/2+1:end)) ...
+                          ./ convTime(1:trials/2);
+    ctx.alpha0 = initialControlAngle(IC(1:trials/2));
 end
+
+runPlots(plots, enabledPlots, ctx);
+
 
 %% Local functions
 
-function IC = buildIC(a, ecc, incl, Omega0, arglat0, w0, Q0, omega0, kw)
+function IC = buildIC(a, ecc, incl, Omega0, arglat0, w0, Q0, omega0, kw, trials)
 %BUILDIC Generate IC struct
 
-arguments
-    a       (1,1) double {mustBePositive}
-    ecc     (1,:) double {mustBeNonnegative}
-    incl    (1,:) double
-    Omega0  (1,:) double
-    arglat0 (1,:) double
-    w0      (1,:) double
-    Q0      (4,:) double
-    omega0  (3,:) double
-    kw      (1,:) double {mustBePositive}
-end
-
-    trials = max([numel(ecc), numel(incl), numel(Omega0), numel(arglat0), ...
-        numel(w0), size(Q0,2), size(omega0,2), numel(kw)]);
+    arguments
+        a       (1,1) double {mustBePositive}
+        ecc     (1,:) double {mustBeNonnegative}
+        incl    (1,:) double
+        Omega0  (1,:) double
+        arglat0 (1,:) double
+        w0      (1,:) double
+        Q0      (4,:) double
+        omega0  (3,:) double
+        kw      (1,:) double {mustBePositive}
+        trials  (1,1) {mustBeInteger, mustBePositive}
+    end
     
     ecc     = broadcastCols(ecc, trials);
     incl    = broadcastCols(incl, trials);
@@ -290,10 +335,10 @@ end
 function out = broadcastCols(val, trials)
 %BROADCASTCOLS like z fill, fills the list with copies of initial element
 %   if needed.
-arguments
-    val    double
-    trials (1,1) double {mustBePositive, mustBeInteger}
-end
+    arguments
+        val    double
+        trials (1,1) double {mustBePositive, mustBeInteger}
+    end
     if size(val, 2) == 1 && trials > 1
         out = repmat(val, 1, trials);
     else
@@ -301,28 +346,44 @@ end
     end
 end
 
-function kw = analyticKw(incl, Omega0, gamma_m, beta_m, To, I)
+function kw = analyticKw(i, Omega0, gamma_m, beta_m, To, I)
 %ANALYTICKW vectorized implementation of the analytical Kw from paper.
 
-arguments
-    incl    (1,:) double
-    Omega0  (1,:) double
-    gamma_m (1,1) double
-    beta_m  (1,1) double
-    To      (1,1) double {mustBePositive}
-    I       (3,3) double
+    arguments
+        i       (1,:) double
+        Omega0  (1,:) double
+        gamma_m (1,1) double
+        beta_m  (1,1) double
+        To      (1,1) double {mustBePositive}
+        I       (3,3) double
+    end
+
+    xi_m = acosd( cosd(i).*cosd(gamma_m) + sind(i).*sind(gamma_m).*cosd(beta_m-Omega0) );
+    kw = 4*pi/To * (1+sind(xi_m)) * min(diag(I));
 end
 
-    xi_m = acosd( cosd(incl).*cosd(gamma_m) + sind(incl).*sind(gamma_m).*cosd(beta_m-Omega0) );
-    kw = 4*pi/To * (1+sind(xi_m)) * min(diag(I));
+function alpha0 = initialControlAngle(IC)
+%INITIALCONTROLANGLE Calculate the inital angle between angular velocity and
+% magnetic field.
+    arguments
+        IC (1,:) struct
+    end
+    alpha0 = zeros(size(IC));
+    for j=1:length(IC)
+        ICj = IC(j);
+        [~, b_B] = dynamics(0, ICj.Q0(1), ICj.Q0(2:4), ICj.omega0, ICj.r0, ICj.v0, ...
+                             I=eye(3), kw=0);   % Reusing the function only for b so many parameters are irrelevant
+        cosT = dot(ICj.omega0, b_B) / (norm(ICj.omega0)*norm(b_B));
+        alpha0(j) = acosd(min(max(cosT,-1),1));
+    end
 end
 
 function reportProgress(total, startTime)
 %REPORTPROGRESS Helper function for parfor loop progress tracking.
-arguments
-    total     (1,1) double {mustBePositive, mustBeInteger}
-    startTime (1,1) uint64
-end
+    arguments
+        total     (1,1) double {mustBePositive, mustBeInteger}
+        startTime (1,1) uint64
+    end
     persistent done
     if isempty(done); done = 0; end
     done = done + 1;

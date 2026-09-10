@@ -31,6 +31,7 @@ function plots = plotting(graphsDir)
     plots.attitudeSweepByTrial  = @attitudeSweepByTrial;
     plots.attitudeSweepByAngles = @attitudeSweepByAngles;
     plots.angleMarginalBar      = @angleMarginalBar;
+    plots.controlAngleSweep     = @controlAngleSweep;
 
 end
 
@@ -222,7 +223,7 @@ function [fig, pctImprovement] = nearAComparison(kw, convTime, trials, options)
     pctImprovement = 100*(analyticalTime - optimalTime)./analyticalTime;
     scenarioLabels = options.ScenarioLabels;
     
-    fig = figure('Position', [100, 100, 700, 450]);
+    fig = figure('Position', [100, 100, 600, 400]);
     hold on; grid on;
     
     barColors = repmat([0.2 0.7 0.3], nScenarios, 1);
@@ -265,7 +266,7 @@ function [fig, improvementPct] = attitudeSweepByTrial(convTime, trials, options)
     
     improvementPct = 100*(tAnalytic - tOptimal)./tAnalytic;
     
-    fig = figure('Position', [100 100 750 400]);
+    fig = figure('Position', [100, 100, 600, 400]);
     hold on; grid on;
     
     stem(1:trials/2, improvementPct, 'filled', 'LineWidth', 1.1, 'MarkerSize', 4, 'Color', 'g');
@@ -350,7 +351,7 @@ function fig = angleMarginalBar(angleValues, medVals, stdVals, angleUnit, angleN
     barColors = repmat([0.2 0.7 0.3], nBars, 1);
     barColors(medVals < 0, :) = repmat([0.8 0.2 0.2], sum(medVals < 0), 1);
     
-    fig = figure('Position', [100, 100, 700, 450]);
+    fig = figure('Position', [100, 100, 600, 400]);
     hold on; grid on;
     
     b = bar(categorical(labels, labels), medVals, 'FaceColor', 'flat');
@@ -379,6 +380,46 @@ function fig = angleMarginalBar(angleValues, medVals, stdVals, angleUnit, angleN
     ylim([min(0, 1.3*yBot), 1.3*yTop]);
     
     hold off;
+    
+    saveFigure(fig, options.SaveName);
+end
+
+%% ------------------------------------------------------------------ %%
+
+function [fig, change, alpha0Sorted] = controlAngleSweep(alpha0, convTime, trials, options)
+%CONTROLANGLESWEEP Settling-time change vs. initial angle between omega
+%   and b.
+
+    arguments
+        alpha0 (1,:) double
+        convTime (1,:) double
+        trials (1,1) double {mustBePositive, mustBeInteger}
+        options.SaveName (1,1) string = ""
+    end
+    
+    tAnalytic = convTime(1:trials/2);
+    tOptimal  = convTime(trials/2+1:end);
+    
+    [alpha0Sorted, sortIdx] = sort(alpha0);
+    tAnalytic = tAnalytic(sortIdx);
+    tOptimal  = tOptimal(sortIdx);
+    
+    % improvementPct = (tAnalytic - tOptimal) ./ tAnalytic * 100;
+    change = tAnalytic - tOptimal;
+    disp(mean(change))
+    
+    fig = figure('Position', [100, 100, 600, 400]);
+    hold on; grid on;
+    
+    plot(alpha0Sorted, change, 'b', 'LineWidth', 1.5);
+    yline(0, 'k-', 'LineWidth', 1);
+    xline(90, 'k--', 'LineWidth', 1, 'HandleVisibility', 'off');
+    
+    hold off;
+    title('Settling-Time Change vs. \alpha_0');
+    xlabel('\alpha_0 [deg]', 'Interpreter', 'tex');
+    ylabel('Change in orbits [-]');
+    xlim([0, 180]);
     
     saveFigure(fig, options.SaveName);
 end

@@ -1,26 +1,27 @@
-function runPlots(plots, enabled, ctx)
+function runPlots(plots, enabled, ctx, saveName)
 %RUNPLOTS Calls all the plotting function asked for.
 
     arguments
         plots (1,1) struct
         enabled (1,1) struct
         ctx (1,1) struct
+        saveName (1,1) struct = struct()
     end
 
     % Function mapping struct
     dispatch = struct();
-    dispatch.angularRate          = @(p,c) p.angularRate(c.results, c.To, c.leg_text);
-    dispatch.quaternionNorm       = @(p,c) p.quaternionNorm(c.results, c.To, c.leg_text);
-    dispatch.actuatorDipoles      = @(p,c) p.actuatorDipoles(c.results, c.To, c.mlim, c.l);
-    dispatch.controlAuthority     = @(p,c) p.controlAuthority(c.results, c.To, c.convIdx, c.leg_text);
-    dispatch.settlingTimeVsKw     = @(p,c) p.settlingTimeVsKw(c.kw, c.convTime);
-    dispatch.nearAComparison      = @(p,c) p.nearAComparison(c.kw, c.convTime, c.trials);
-    dispatch.attitudeSweepByTrial = @(p,c) p.attitudeSweepByTrial(c.convTime, c.trials);
-    dispatch.attitudeSweepByAngles = @(p,c) p.attitudeSweepByAngles( ...
-        c.axisColat, c.axisLon, c.rotAngle, ...
-        c.axisColatGrid, c.axisLonGrid, c.rotAngleGrid, ...
-        c.improvementPct, c.kwOptimal, c.kwAnalytic);
-    dispatch.controlAngleSweep    = @(p,c) p.controlAngleSweep(c.alpha0, c.convTime, c.trials);
+    dispatch.angularRate           = @(p,c,s) p.angularRate(c.results, c.To, c.leg_text, SaveName=s);
+    dispatch.controlTorque         = @(p,c,s) p.controlTorque(c.results, c.To, c.leg_text, SaveName=s);
+    dispatch.quaternionNorm        = @(p,c,s) p.quaternionNorm(c.results, c.To, c.leg_text, SaveName=s);
+    dispatch.actuatorDipoles       = @(p,c,s) p.actuatorDipoles(c.results, c.To, c.mlim, c.l, SaveName=s);
+    dispatch.controlAuthority      = @(p,c,s) p.controlAuthority(c.results, c.To, c.convIdx, c.leg_text, SaveName=s);
+    dispatch.settlingTimeVsKw      = @(p,c,s) p.settlingTimeVsKw(c.kw, c.convTime, SaveName=s);
+    dispatch.nearAComparison       = @(p,c,s) p.nearAComparison(c.kw, c.convTime, c.trials, SaveName=s);
+    dispatch.attitudeSweepByTrial  = @(p,c,s) p.attitudeSweepByTrial(c.convTime, c.trials, SaveName=s);
+    dispatch.attitudeSweepByAngles = @(p,c,s) p.attitudeSweepByAngles( ...
+        c.axisColat, c.axisLon, c.rotAngle, c.axisColatGrid, c.axisLonGrid, c.rotAngleGrid, ...
+        c.improvementPct, c.kwOptimal, c.kwAnalytic, SaveName=s);
+    dispatch.controlAngleSweep     = @(p,c,s) p.controlAngleSweep(c.alpha0, c.convTime, c.trials, SaveName=s);
 
     names = fieldnames(enabled);
     for k = 1:numel(names)
@@ -49,7 +50,11 @@ function runPlots(plots, enabled, ctx)
         end
     
         try
-            dispatch.(name)(plots, ctx);
+            if isfield(saveName, name)
+                dispatch.(name)(plots, ctx, saveName.(name));
+            else
+                dispatch.(name)(plots, ctx, "");
+            end
         catch ME
             warning("runPlots:plotFailed", ...
                 "Plot '%s' failed (%s) - skipping...", name, ME.message);

@@ -1,14 +1,6 @@
 function plots = plotting(graphsDir)
 %PLOTTING Returns struct of all plotting functions
 %
-%   Usage in Project.m:
-%       plots = plotting();             
-%       plots.angularRate(results, To, leg_text);
-%       plots.actuatorDipoles(results, To, mlim, l, SaveName="pt2_actu.png");
-%       [~, improvementPct] = plots.attitudeSweepByTrial(convTime, trials);
-%       plots.attitudeSweepByAngles(axisColat, axisLon, rotAngle, ...
-%           axisColatGrid, axisLonGrid, rotAngleGrid, improvementPct, ...
-%           kwOptimal, kwAnalytic, SaveNamePrefix="pt2_attitudeSweep");
 
     arguments
         graphsDir (1,1) string = "graphs"
@@ -23,6 +15,7 @@ function plots = plotting(graphsDir)
     plots.graphsDir = graphsDir;
     
     plots.angularRate           = @angularRate;
+    plots.controlTorque         = @controlTorque;
     plots.quaternionNorm        = @quaternionNorm;
     plots.actuatorDipoles       = @actuatorDipoles;
     plots.controlAuthority      = @controlAuthority;
@@ -58,6 +51,34 @@ function fig = angularRate(results, To, leg_text, trialIdx, options)
     ylabel('||\omega|| [rad/s]');
     if isfield(leg_text, 'omega') && ~isempty({leg_text.omega})
         legend(leg_text.omega, 'Interpreter', 'tex', 'Location', 'best');
+    end
+    
+    saveFigure(fig, options.SaveName);
+end
+
+%% ------------------------------------------------------------------ %%
+
+function fig = controlTorque(results, To, leg_text, trialIdx, options)
+%CONTROLTORQUE ||M|| vs t/T.
+
+    arguments
+        results   cell
+        To        (1,1) double {mustBePositive}
+        leg_text  struct
+        trialIdx  (1,:) double {mustBePositive, mustBeInteger} = 1:numel(results)
+        options.SaveName (1,1) string = ""
+    end
+    
+    fig = figure('Position', [100, 100, 600, 400]);
+    hold on; grid on;
+    for j = trialIdx
+        plot(results{j}.Time/To, vecnorm(results{j}.M, 2, 2), 'LineWidth', 1.5);
+    end
+    hold off;
+    title('Control torque over time'); xlabel('t/T [-]');
+    ylabel('||M|| [N\cdot m]');
+    if isfield(leg_text, 'M') && ~isempty({leg_text.omega})
+        legend(leg_text.M, 'Interpreter', 'tex', 'Location', 'best');
     end
     
     saveFigure(fig, options.SaveName);
@@ -159,9 +180,9 @@ function fig = controlAuthority(results, To, convIdx, leg_text, trialIdx, option
     
     yline(90, 'k--', 'LineWidth', 1);
     hold off;
-    title('Angle Between \omega and b');
+    title('Control Angle over time');
     xlabel('t/T [-]');
-    ylabel('\alpha(\omega, b) [deg]');
+    ylabel('\alpha [deg]');
     ylim([0, 180]);
     if isfield(leg_text, 'alpha') && ~isempty({leg_text.alpha})
         legend(leg_text.alpha, 'Location', 'best', 'Interpreter', 'tex');
@@ -296,7 +317,7 @@ function figs = attitudeSweepByAngles(axisColat, axisLon, rotAngle, ...
         improvementPct  (1,:) double
         kwOptimal       (1,1) double {mustBePositive}
         kwAnalytic      (1,1) double {mustBePositive}
-        options.SaveNamePrefix (1,1) string = ""
+        options.SaveName (1,1) string = ""
     end
     
     colatMed = zeros(size(axisColat)); colatStd = zeros(size(axisColat));
@@ -317,7 +338,7 @@ function figs = attitudeSweepByAngles(axisColat, axisLon, rotAngle, ...
     end
     
     kwInfo = sprintf(' (k_\\omega=%.3e vs %.3e)', kwOptimal, kwAnalytic);
-    prefix = options.SaveNamePrefix;
+    prefix = options.SaveName;
     
     figs(1) = angleMarginalBar(axisColat, colatMed, colatStd, 'deg', ...
         'Axis Colatitude', kwInfo, SaveName=nameOrEmpty(prefix, "_colat.png"));
@@ -453,7 +474,7 @@ function saveFigure(fig, saveName)
     end
     
     if saveName ~= ""
-        exportgraphics(fig, fullfile(graphsDirRegistry(), saveName), 'Resolution', 300);
+        exportgraphics(fig, fullfile(graphsDirRegistry(), saveName), Resolution=600);
     end
 end
 

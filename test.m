@@ -10,25 +10,26 @@ clc; clearvars; close all;
 % omega = [1 0 0].';
 
 % case A
-Omega = 0:1:360; 
-u = 0:1:360;
+Omega = 0:2:360; 
+u = 0:2:360;
 i = 11;
 Q = [0.375 -0.062  0.925 -0.007];
 omega = [0.604 -0.76 -0.384];
+omega_hat = omega/norm(omega);
 r_c = 7021;
 Q = Q/norm(Q);
 mu = 3.986e5;
 
 [OmegaGrid, uGrid] = meshgrid(Omega, u);
-Omega = OmegaGrid(:).';
-u = uGrid(:).';
+OmegaGrid = OmegaGrid(:).';
+uGrid = uGrid(:).';
 
-N = numel(Omega);
+N = numel(OmegaGrid);
 
-cO = cosd(Omega);
-sO = sind(Omega);
-cu = cosd(u);
-su = sind(u);
+cO = cosd(OmegaGrid);
+sO = sind(OmegaGrid);
+cu = cosd(uGrid);
+su = sind(uGrid);
 ci = cosd(i);
 si = sind(i);
 
@@ -41,14 +42,18 @@ v = sqrt(mu/r_c)*[ ...
     -sO.*su + cO.*cu.*ci;
      cu.*si ];
 
-b_ECI = reshape(getMagVec(r, zeros(1,length(r))),3,1,[]);
+b_ECI = getMagVec(r, zeros(1,length(r)));
+bhat_ECI = reshape(b_ECI./vecnorm(b_ECI,2,1),3,1,[]);
 R_I2O = getECI2O(r, v);
 R_O2B = quat2dcm(Q);
-% b = pagemtimes(R_O2B+zeros(size(R_I2O)),pagemtimes(R_I2O,b_ECI));
-b = pagemtimes(R_I2O,b_ECI);
-b = reshape(b,3,[]);
+bhat = pagemtimes(R_O2B+zeros(size(R_I2O)),pagemtimes(R_I2O,bhat_ECI));
+% bhat = pagemtimes(R_I2O,b_ECI);
+bhat= reshape(bhat,3,[]);
 
-[alignment, idx] = min(vecnorm(cross([0;-1;0]+zeros(size(b)),b),2,1));
-disp(Omega(idx))
-disp(u(idx))
+score = abs(dot(omega.'+zeros(size(bhat)),bhat) - cos(5/8*pi));
+[alignment, idx] = min(score);
+disp(OmegaGrid(idx))
+disp(uGrid(idx))
 disp(alignment)
+
+score = reshape(score,length(Omega),length(u));
